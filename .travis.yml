@@ -13,6 +13,7 @@ script:
   - isort -c -rc async_asgi_testclient
   - black --check async_asgi_testclient
   - flake8 async_asgi_testclient
+  - mypy async_asgi_testclient --ignore-missing-imports --disallow-untyped-defs
   - pytest --cov=async_asgi_testclient -v --cov-report term-missing async_asgi_testclient
 after_success:
   - codecov
