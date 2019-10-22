@@ -22,9 +22,13 @@ WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
+import typing
+
+from async_asgi_testclient import types
 from async_asgi_testclient.compatibility import guarantee_single_callable
 from async_asgi_testclient.response import BytesRW
 from async_asgi_testclient.response import Response
+from async_asgi_testclient.types import ASGIApp
 from async_asgi_testclient.utils import create_monitored_task
 from async_asgi_testclient.utils import is_last_one
 from async_asgi_testclient.utils import Message
@@ -34,7 +38,7 @@ from functools import partial
 from http.cookies import SimpleCookie
 from json import dumps
 from multidict import CIMultiDict
-from typing import Any
+from typing import Any, Dict
 from typing import List
 from typing import Optional
 from typing import Tuple
@@ -58,15 +62,15 @@ class TestClient:
     __test__ = False  # prevent pytest.PytestCollectionWarning
 
     def __init__(
-        self, application, use_cookies: bool = True, timeout: Optional[int] = None
+        self, application: ASGIApp, use_cookies: bool = True, timeout: Optional[int] = None
     ):
         self.application = guarantee_single_callable(application)
-        self.cookie_jar = SimpleCookie() if use_cookies else None
+        self.cookie_jar: Optional[SimpleCookie] = SimpleCookie() if use_cookies else None
         self._lifespan_input_queue: asyncio.Queue[dict] = asyncio.Queue()
         self._lifespan_output_queue: asyncio.Queue[dict] = asyncio.Queue()
         self.timeout = timeout
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> "TestClient":
         create_monitored_task(
             self.application(
                 {"type": "lifespan", "asgi": {"version": "3.0"}},
@@ -79,10 +83,10 @@ class TestClient:
         await self.send_lifespan("startup")
         return self
 
-    async def __aexit__(self, exc_type, exc, tb):
+    async def __aexit__(self, exc_type, exc, tb) -> None:
         await self.send_lifespan("shutdown")
 
-    async def send_lifespan(self, action):
+    async def send_lifespan(self, action: str) -> None:
         await self._lifespan_input_queue.put({"type": f"lifespan.{action}"})
         message = await receive(self._lifespan_output_queue, timeout=self.timeout)
 
@@ -94,7 +98,7 @@ class TestClient:
         elif message["type"] == f"lifespan.{action}.failed":
             raise Exception(message)
 
-    def websocket_connect(self, path, extra_headers=None):
+    def websocket_connect(self, path: str, extra_headers: Optional[Dict[str,str]]=None) -> WebSocketSession:
         return WebSocketSession(self.application, path, extra_headers)
 
     async def open(
@@ -259,7 +263,7 @@ class TestClient:
         else:
             return response
 
-    async def wait_response(self, receive_or_fail, type_):
+    async def wait_response(self, receive_or_fail, type_) -> types.Message:
         message = await receive_or_fail()
         if not isinstance(message, dict):
             raise Exception(f"Unexpected message {message}")

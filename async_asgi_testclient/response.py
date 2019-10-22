@@ -1,3 +1,5 @@
+from typing import Optional, AsyncGenerator, AsyncIterator, Any, Iterator, IO
+
 from requests.exceptions import StreamConsumedError
 from requests.models import Response as _Response
 from requests.utils import iter_slices
@@ -6,13 +8,16 @@ from requests.utils import stream_decode_response_unicode
 import io
 
 
+from async_asgi_testclient.types import Receive, Send
+
+
 class BytesRW(object):
-    def __init__(self):
-        self._stream = io.BytesIO()
+    def __init__(self) -> None:
+        self._stream: IO[bytes] = io.BytesIO()
         self._rpos = 0
         self._wpos = 0
 
-    def read(self, size=-1):
+    def read(self, size: int=-1) -> bytes:
         if self._stream is None:
             raise Exception("Stream is closed")
         self._stream.seek(self._rpos)
@@ -20,7 +25,7 @@ class BytesRW(object):
         self._rpos += len(bytes_)
         return bytes_
 
-    def write(self, b):
+    def write(self, b: bytes) -> int:
         if self._stream is None:
             raise Exception("Stream is closed")
         self._stream.seek(self._wpos)
@@ -28,12 +33,12 @@ class BytesRW(object):
         self._wpos += n
         return n
 
-    def close(self):
+    def close(self) -> None:
         self._stream = None
 
 
 class Response(_Response):
-    def __init__(self, stream: bool, receive, send):
+    def __init__(self, stream: bool, receive: Receive, send: Send):
         super().__init__()
 
         self.stream = stream
@@ -42,11 +47,11 @@ class Response(_Response):
         self._more_body = False
         self.raw = BytesRW()
 
-    async def __aiter__(self):
+    async def __aiter__(self) -> AsyncGenerator:
         async for c in self.iter_content(128):
             yield c
 
-    async def generate(self, n):
+    async def generate(self, n: Optional[int]) -> None:
         while True:
             val = self.raw.read(n)
             if val == b"":  # EOF
@@ -68,9 +73,9 @@ class Response(_Response):
         # Send disconnect
         self.send({"type": "http.disconnect"})
         message = await self.receive_or_fail()
-        assert message.event == "exit"
+        assert message.event == "exit"  # type: ignore
 
-    async def iter_content(self, chunk_size=1, decode_unicode=False):
+    async def iter_content(self, chunk_size: Optional[int]=1, decode_unicode: bool=False) -> AsyncGenerator:
         if self._content_consumed and isinstance(self._content, bool):
             raise StreamConsumedError()
         elif chunk_size is not None and not isinstance(chunk_size, int):

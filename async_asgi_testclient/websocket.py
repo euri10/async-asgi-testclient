@@ -1,3 +1,4 @@
+from async_asgi_testclient.types import ASGIApp
 from async_asgi_testclient.utils import create_monitored_task
 from async_asgi_testclient.utils import Message
 from async_asgi_testclient.utils import receive
@@ -9,7 +10,7 @@ import json
 
 
 class WebSocketSession:
-    def __init__(self, app, path, extra_headers):
+    def __init__(self, app: ASGIApp, path, extra_headers):
         self.path = path
         self.headers = extra_headers or {}
         self.app = app
